@@ -93,6 +93,7 @@ const Login: React.FC = () => {
             </div>
              <p className="mt-2 text-xs text-gray-500">للتجربة، استخدم (اسم المستخدم: admin) (كلمة المرور: admin123)</p>
             <button type="submit" className="mt-6 w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-md shadow-sm text-lg font-medium text-white bg-sea-maroon hover:bg-sea-maroon-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sea-maroon">
+              <SupervisorIcon className="w-5 h-5 ml-2" />
               تسجيل الدخول كمشرف
             </button>
           </form>
