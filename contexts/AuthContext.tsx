@@ -1,6 +1,7 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, UserRole } from '../types';
+import { User, UserRole, Employee } from '../types';
+import { EMPLOYEES } from '../data/mock';
 
 interface AuthContextType {
   user: User | null;
@@ -11,11 +12,37 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-const CREDENTIALS = {
-  supervisor: { username: 'admin', pin: 'admin123' },
-  waiter: { pin: '101' },
-  kitchen: { pin: '111' },
-  bar: { pin: '222' },
+// Login labels per role for nicer display
+const ROLE_LABELS: Record<UserRole, string> = {
+  supervisor: 'مدير النظام',
+  waiter: 'نادل',
+  kitchen: 'شاشة المطبخ',
+  bar: 'شاشة المشروبات',
+};
+
+/**
+ * Find a matching employee by role + PIN (+ username for supervisor).
+ * Returns the Employee record if found, otherwise null.
+ *
+ * Security note: in a real application PINs must be hashed server-side
+ * (bcrypt/argon2) and validated via an API call. This client-side
+ * implementation is intended for the demo/mock data only.
+ */
+const findEmployee = (
+  role: UserRole,
+  pin?: string,
+  username?: string
+): Employee | null => {
+  if (!pin) return null;
+  return (
+    EMPLOYEES.find(
+      (e) =>
+        e.role === role &&
+        e.pin === pin &&
+        e.status === 'Active' &&
+        (role !== 'supervisor' || username === 'admin')
+    ) || null
+  );
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -30,45 +57,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(JSON.parse(storedUser));
       }
     } catch (error) {
-      console.error("Failed to parse user from sessionStorage", error);
+      console.error('Failed to parse user from sessionStorage', error);
       sessionStorage.removeItem('user');
     } finally {
       setLoading(false);
     }
   }, []);
 
-  const login = async (role: UserRole, pin?: string, username?: string): Promise<boolean> => {
-    let authenticated = false;
-    let userName = 'User';
+  const login = async (
+    role: UserRole,
+    pin?: string,
+    username?: string
+  ): Promise<boolean> => {
+    const employee = findEmployee(role, pin, username);
+    if (!employee) return false;
 
-    if (role === 'supervisor' && username === CREDENTIALS.supervisor.username && pin === CREDENTIALS.supervisor.pin) {
-      authenticated = true;
-      userName = 'مدير النظام';
-    } else if (role === 'waiter' && pin === CREDENTIALS.waiter.pin) {
-      authenticated = true;
-      userName = `نادل #${pin}`;
-    } else if (role === 'kitchen' && pin === CREDENTIALS.kitchen.pin) {
-      authenticated = true;
-      userName = 'شاشة المطبخ';
-    } else if (role === 'bar' && pin === CREDENTIALS.bar.pin) {
-      authenticated = true;
-      userName = 'شاشة المشروبات';
+    // Use the employee name when available, fallback to a generic role label.
+    const displayName =
+      role === 'supervisor' || role === 'kitchen' || role === 'bar'
+        ? ROLE_LABELS[role]
+        : `${ROLE_LABELS[role]} ${employee.name}`;
+
+    const newUser: User = { name: displayName, role };
+    setUser(newUser);
+    sessionStorage.setItem('user', JSON.stringify(newUser));
+
+    switch (role) {
+      case 'kitchen':
+        navigate('/kds');
+        break;
+      case 'bar':
+        navigate('/drinks');
+        break;
+      default:
+        navigate('/dashboard');
+        break;
     }
-
-    if (authenticated) {
-      const newUser = { name: userName, role };
-      setUser(newUser);
-      sessionStorage.setItem('user', JSON.stringify(newUser));
-      
-      switch (role) {
-        case 'kitchen': navigate('/kds'); break;
-        case 'bar': navigate('/drinks'); break;
-        default: navigate('/dashboard'); break;
-      }
-      return true;
-    }
-
-    return false;
+    return true;
   };
 
   const logout = () => {
